@@ -1,0 +1,50 @@
+# Training data and models
+face_recognizer.yml
+labels.pkl
+TrainingImageLabel/
+*.yml
+*.pkl
+
+# Face image samples
+images/
+TrainingImage/
+
+# Attendance records (CSV files)
+Attendance/
+Attendance_*.csv
+*.csv
+
+# Student database
+StudentDetails/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environment
+venv/
+env/
+ENV/
+.venv
+
+# IDE settings
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
