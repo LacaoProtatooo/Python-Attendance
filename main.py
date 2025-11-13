@@ -7,6 +7,10 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from PIL import Image, ImageTk
 import threading
+from database import AttendanceDatabase
+from attendance_page import AttendancePage
+from admin_dashboard import AdminDashboard
+from student_dashboard import StudentDashboard
 
 class AttendanceSystem:
     def __init__(self, root):
@@ -14,6 +18,9 @@ class AttendanceSystem:
         self.root.title("Face Recognition Attendance System")
         self.root.geometry("1000x700")
         self.root.configure(bg='#2c3e50')
+        
+        # Database
+        self.db = AttendanceDatabase()
         
         # Variables
         self.camera_active = False
@@ -101,11 +108,35 @@ class AttendanceSystem:
                                         fg='white', relief=tk.GROOVE, borderwidth=2)
         attendance_frame.pack(pady=10, padx=20, fill=tk.X)
         
-        self.attendance_btn = tk.Button(attendance_frame, text="Start Attendance", 
-                                       font=("Arial", 11, "bold"), bg='#2ecc71', 
-                                       fg='white', command=self.start_attendance,
+        quick_attend_btn = tk.Button(attendance_frame, text="⚡ Quick Attendance", 
+                                     font=("Arial", 11, "bold"), bg='#2ecc71', 
+                                     fg='white', command=self.start_attendance,
+                                     cursor='hand2', relief=tk.RAISED, borderwidth=2)
+        quick_attend_btn.pack(pady=10, fill=tk.X)
+        
+        advanced_attend_btn = tk.Button(attendance_frame, text="📱 Advanced Attendance Page", 
+                                       font=("Arial", 10, "bold"), bg='#1abc9c', 
+                                       fg='white', command=self.open_attendance_page,
                                        cursor='hand2', relief=tk.RAISED, borderwidth=2)
-        self.attendance_btn.pack(pady=20)
+        advanced_attend_btn.pack(pady=5, fill=tk.X)
+        
+        # Dashboard section
+        dashboard_frame = tk.LabelFrame(right_frame, text="Dashboard", 
+                                       font=("Arial", 12, "bold"), bg='#34495e', 
+                                       fg='white', relief=tk.GROOVE, borderwidth=2)
+        dashboard_frame.pack(pady=10, padx=20, fill=tk.X)
+        
+        admin_btn = tk.Button(dashboard_frame, text="📊 Admin Dashboard", 
+                            font=("Arial", 11, "bold"), bg='#9b59b6', 
+                            fg='white', command=self.open_admin_dashboard,
+                            cursor='hand2', relief=tk.RAISED, borderwidth=2)
+        admin_btn.pack(pady=5, fill=tk.X)
+        
+        student_btn = tk.Button(dashboard_frame, text="👤 Student Dashboard", 
+                              font=("Arial", 11, "bold"), bg='#16a085', 
+                              fg='white', command=self.open_student_dashboard,
+                              cursor='hand2', relief=tk.RAISED, borderwidth=2)
+        student_btn.pack(pady=5, fill=tk.X)
         
         # Utility buttons
         utility_frame = tk.Frame(right_frame, bg='#34495e')
@@ -148,6 +179,14 @@ class AttendanceSystem:
             messagebox.showwarning("Warning", "Camera is already active!")
             return
         
+        # Add student to database if not exists
+        student_info = self.db.get_student_by_name(name)
+        if not student_info:
+            success, student_id = self.db.add_student(name)
+            if not success:
+                messagebox.showerror("Error", f"Failed to add student to database: {student_id}")
+                return
+        
         self.registration_name = name
         self.samples_collected = 0
         self.frame_count = 0
@@ -176,6 +215,91 @@ class AttendanceSystem:
         self.current_mode = 'attendance'
         self.progress_frame.pack_forget()
         self.start_camera()
+    
+    def open_attendance_page(self):
+        """Open the attendance marking page"""
+        if not os.path.exists('face_recognizer.yml'):
+            messagebox.showerror("Error", "No trained model found!\nPlease register faces first.")
+            return
+        
+        self.stop_camera()
+        self.root.withdraw()
+        
+        new_window = tk.Toplevel(self.root)
+        AttendancePage(new_window, self)
+    
+    def open_admin_dashboard(self):
+        """Open the admin dashboard"""
+        self.stop_camera()
+        self.root.withdraw()
+        
+        new_window = tk.Toplevel(self.root)
+        AdminDashboard(new_window, self)
+    
+    def open_student_dashboard(self):
+        """Open student dashboard"""
+        # Create a dialog to select student
+        student_window = tk.Toplevel(self.root)
+        student_window.title("Select Student")
+        student_window.geometry("400x300")
+        student_window.configure(bg='#2c3e50')
+        
+        tk.Label(student_window, text="Select Student", 
+                font=("Arial", 14, "bold"), bg='#2c3e50', fg='white').pack(pady=20)
+        
+        # Get all students
+        students = self.db.get_all_students()
+        
+        if not students:
+            messagebox.showwarning("Warning", "No students registered!")
+            student_window.destroy()
+            return
+        
+        # Create listbox
+        frame = tk.Frame(student_window, bg='#34495e')
+        frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        
+        scrollbar = ttk.Scrollbar(frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        listbox = tk.Listbox(frame, font=("Arial", 10), yscrollcommand=scrollbar.set)
+        scrollbar.config(command=listbox.yview)
+        listbox.pack(fill=tk.BOTH, expand=True)
+        
+        for student_id, name, email, student_id_num, status, created_at in students:
+            listbox.insert(tk.END, name)
+        
+        def open_dashboard():
+            selection = listbox.curselection()
+            if not selection:
+                messagebox.showwarning("Warning", "Please select a student!")
+                return
+            
+            index = selection[0]
+            student_id = students[index][0]
+            student_name = students[index][1]
+            
+            self.stop_camera()
+            self.root.withdraw()
+            student_window.destroy()
+            
+            new_window = tk.Toplevel(self.root)
+            StudentDashboard(new_window, student_id, student_name, self)
+        
+        btn_frame = tk.Frame(student_window, bg='#2c3e50')
+        btn_frame.pack(fill=tk.X, padx=20, pady=10)
+        
+        select_btn = tk.Button(btn_frame, text="Open Dashboard", 
+                             font=("Arial", 10, "bold"), bg='#3498db', 
+                             fg='white', command=open_dashboard,
+                             cursor='hand2')
+        select_btn.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+        
+        close_btn = tk.Button(btn_frame, text="Cancel", 
+                            font=("Arial", 10, "bold"), bg='#95a5a6', 
+                            fg='white', command=student_window.destroy,
+                            cursor='hand2')
+        close_btn.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
         
     def start_camera(self):
         self.camera_active = True
@@ -189,7 +313,6 @@ class AttendanceSystem:
         self.status_label.config(text="Camera Active", fg='#2ecc71')
         self.stop_btn.config(state=tk.NORMAL)
         self.register_btn.config(state=tk.DISABLED)
-        self.attendance_btn.config(state=tk.DISABLED)
         
         self.update_frame()
         
@@ -202,7 +325,6 @@ class AttendanceSystem:
         self.status_label.config(text="Camera Off", fg='#e74c3c')
         self.stop_btn.config(state=tk.DISABLED)
         self.register_btn.config(state=tk.NORMAL)
-        self.attendance_btn.config(state=tk.NORMAL)
         
         self.current_mode = None
         
